@@ -21,36 +21,12 @@
 #define CIR_RXSTA  0x30
 #define CIR_RXCFG  0x34
 
-#if CONFIG(CIR_USE_OSC24M)
-/* parent clock is predivided by 192 */
-#define CIR_CLK_RATE 125000UL
-#else
-#define CIR_CLK_RATE 32768UL
-#endif
-
-/* RC6 time unit is 16 periods @ 36 kHz, ~444 us */
-#define RC6_TIME_UNIT 444UL
-
-/* convert specified number of time units to number of clock cycles */
-#define UNITS_TO_CLKS(num) (((num) * CIR_CLK_RATE * RC6_TIME_UNIT) / 1000000UL)
-
 struct sunxi_cir_state {
 	struct device_state ds;
-	struct rc6_ctx      rc6_ctx;
+	struct dec_rtx      dec_rtx;
 	uint32_t            clk_stash;
 	uint32_t            cfg_stash;
 	uint32_t            ctl_stash;
-};
-
-static const int16_t sunxi_cir_rc6_durations[RC6_STATES] = {
-	[RC6_IDLE]      = UNITS_TO_CLKS(6),
-	[RC6_LEADER_S]  = UNITS_TO_CLKS(2),
-	[RC6_HEADER_P]  = UNITS_TO_CLKS(1),
-	[RC6_HEADER_N]  = UNITS_TO_CLKS(1),
-	[RC6_TRAILER_P] = UNITS_TO_CLKS(2),
-	[RC6_TRAILER_N] = UNITS_TO_CLKS(2),
-	[RC6_DATA_P]    = UNITS_TO_CLKS(1),
-	[RC6_DATA_N]    = UNITS_TO_CLKS(1),
 };
 
 static inline const struct sunxi_cir *
@@ -70,20 +46,20 @@ sunxi_cir_poll(const struct device *dev)
 {
 	const struct sunxi_cir *self  = to_sunxi_cir(dev);
 	struct sunxi_cir_state *state = sunxi_cir_state_for(dev);
-	struct rc6_ctx *rc6_ctx       = &state->rc6_ctx;
+	struct dec_rtx *dec_rtx       = &state->dec_rtx;
 
 	/* Feed the decoder data as needed and as it becomes available. */
-	if (rc6_ctx->width <= 0) {
+	if (dec_rtx->width <= 0) {
 		/* If no data is available, do not call the decoder. */
 		if (!(mmio_read_32(self->regs + CIR_RXSTA) >> 8))
 			return 0;
 
 		uint32_t sample = mmio_read_32(self->regs + CIR_RXFIFO);
-		rc6_ctx->pulse = sample >> 7;
-		rc6_ctx->width = sample & GENMASK(6, 0);
+		dec_rtx->pulse = sample >> 7;
+		dec_rtx->width = sample & GENMASK(6, 0);
 	}
 
-	return rc6_decode(rc6_ctx);
+	return rc6_decode(dec_rtx);
 }
 
 static int
@@ -91,8 +67,6 @@ sunxi_cir_probe(const struct device *dev UNUSED)
 {
 	const struct sunxi_cir *self  = to_sunxi_cir(dev);
 	struct sunxi_cir_state *state = sunxi_cir_state_for(dev);
-
-	state->rc6_ctx.durations = sunxi_cir_rc6_durations;
 
 	state->clk_stash = mmio_read_32(R_CIR_RX_CLK_REG);
 	state->cfg_stash = mmio_read_32(self->regs + CIR_RXCFG);

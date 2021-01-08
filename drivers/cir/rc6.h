@@ -8,25 +8,25 @@
 
 #include <stdint.h>
 
-enum {
-	RC6_IDLE,
-	RC6_LEADER_S,
-	RC6_HEADER_P,
-	RC6_HEADER_N,
-	RC6_TRAILER_P,
-	RC6_TRAILER_N,
-	RC6_DATA_P,
-	RC6_DATA_N,
-	RC6_STATES
-};
+#if CONFIG(CIR_USE_OSC24M)
+/* parent clock is predivided by 192 */
+#define CIR_CLK_RATE 125000UL
+#else
+#define CIR_CLK_RATE 32768UL
+#endif
 
-struct rc6_ctx {
-	const int16_t *durations;
-	uint32_t       buffer;
-	uint8_t        bits;
-	uint8_t        state;
-	uint8_t        pulse;
-	int8_t         width;
+#define US_TO_CLKS(num) (((num) * CIR_CLK_RATE) / 1000000UL)
+
+#define EQ_MARGIN(val, time, margin) \
+	(((time) - (margin)) < (val) && (val) < ((time) + (margin)))
+
+struct dec_rtx {
+	uint32_t buffer;
+	uint32_t counter;
+	uint8_t  bits;
+	uint8_t  state;
+	uint8_t  pulse;
+	int8_t   width;
 };
 
 /**
@@ -40,6 +40,6 @@ struct rc6_ctx {
  *
  * @return A successfully decoded scancode, or zero.
  */
-uint32_t rc6_decode(struct rc6_ctx *ctx);
+uint32_t rc6_decode(struct dec_rtx *ctx);
 
 #endif /* RC6_PRIVATE_H */

@@ -4,6 +4,9 @@
 #
 
 obj-y += cir.o
-obj-y += rc6.o
+obj-$(CONFIG_CIR_RC6) += rc6.o
+obj-$(CONFIG_CIR_NEC) += nec.o
+obj-$(CONFIG_CIR_NECX) += nec.o
+
 
 obj-y += sunxi-cir.o

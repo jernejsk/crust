@@ -12,10 +12,39 @@
 #define NUM_DATA_BITS   32
 #define NUM_HEADER_BITS 4
 
+/* RC6 time unit is 16 periods @ 36 kHz, ~444 us */
+#define RC6_TIME_UNIT 444UL
+
+/* convert specified number of time units to number of clock cycles */
+#define RC6_UNITS_TO_CLKS(num) US_TO_CLKS((num) * RC6_TIME_UNIT)
+
+enum {
+	RC6_IDLE,
+	RC6_LEADER_S,
+	RC6_HEADER_P,
+	RC6_HEADER_N,
+	RC6_TRAILER_P,
+	RC6_TRAILER_N,
+	RC6_DATA_P,
+	RC6_DATA_N,
+	RC6_STATES
+};
+
+static const int16_t rc6_durations[RC6_STATES] = {
+	[RC6_IDLE]      = RC6_UNITS_TO_CLKS(6),
+	[RC6_LEADER_S]  = RC6_UNITS_TO_CLKS(2),
+	[RC6_HEADER_P]  = RC6_UNITS_TO_CLKS(1),
+	[RC6_HEADER_N]  = RC6_UNITS_TO_CLKS(1),
+	[RC6_TRAILER_P] = RC6_UNITS_TO_CLKS(2),
+	[RC6_TRAILER_N] = RC6_UNITS_TO_CLKS(2),
+	[RC6_DATA_P]    = RC6_UNITS_TO_CLKS(1),
+	[RC6_DATA_N]    = RC6_UNITS_TO_CLKS(1),
+};
+
 uint32_t
-rc6_decode(struct rc6_ctx *ctx)
+rc6_decode(struct dec_rtx *ctx)
 {
-	int32_t duration = ctx->durations[ctx->state];
+	int32_t duration = rc6_durations[ctx->state];
 	int32_t epsilon  = duration >> 1;
 
 	/* Subtract the expected pulse with from the sample width. */
